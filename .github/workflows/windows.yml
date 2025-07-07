@@ -19,13 +19,23 @@ jobs:
         include:
           - vs-version: vs2015
             toolset-version: v140
-            # Use the official component ID for the v140 build tools
-            vc-component: Microsoft.VisualStudio.Component.VC.Tools.v140
+            # Add the v140 toolset, a compatible Win10 SDK, and core C++ libraries
+            vc-components: >-
+              [
+                "Microsoft.VisualStudio.Component.VC.Tools.v140",
+                "Microsoft.VisualStudio.Component.Windows10SDK.10240",
+                "Microsoft.VisualStudio.Component.VC.ATL",
+                "Microsoft.VisualStudio.Component.VC.MFC"
+              ]
 
           - vs-version: vs2017
             toolset-version: v141
-            # Use the official component ID for the v141 build tools
-            vc-component: Microsoft.VisualStudio.Component.VC.Tools.v141
+            # Add the v141 toolset and ensure the core C++ workload is present
+            vc-components: >-
+              [
+                "Microsoft.VisualStudio.Component.VC.Tools.v141",
+                "Microsoft.VisualStudio.Workload.VCTools"
+              ]
 
           - vs-version: vs2019
             toolset-version: v142
@@ -40,18 +50,17 @@ jobs:
       with:
         submodules: true
 
-    - name: Install Older VS Build Tools
-      if: matrix.vc-component
+    - name: Install Older VS Build Tools and Dependencies
+      if: matrix.vc-components
       shell: pwsh
       run: |
-        echo "Installing component ${{ matrix.vc-component }}..."
-        $process = Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" -ArgumentList "modify --installPath `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise`" --add ${{ matrix.vc-component }} --quiet --norestart --nocache" -Wait -PassThru
+        $components = ConvertFrom-Json '${{ matrix.vc-components }}'
+        $componentArgs = $components | ForEach-Object { "--add $_" }
+        echo "Installing components: $components"
+        $process = Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" -ArgumentList "modify --installPath `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise`" $componentArgs --quiet --norestart --nocache" -Wait -PassThru
         if ($process.ExitCode -ne 0) {
             throw "VS Installer failed with exit code $($process.ExitCode)"
         }
-        
-    # The rest of your build steps remain unchanged.
-    # The setup-msbuild step has been removed.
 
     - name: cache-protobuf
       id: cache-protobuf
