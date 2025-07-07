@@ -2,32 +2,8 @@ name: windows
 on:
   push:
     branches: [master]
-    paths:
-    - '.github/workflows/windows.yml'
-    - 'CMakeLists.txt'
-    - 'cmake/**'
-    - 'src/*'
-    - 'src/layer/*'
-    - 'src/layer/x86/**'
-    - 'src/layer/vulkan/**'
-    - 'tests/**'
-    - 'tools/**'
-    - '!tools/pnnx/**'
-    - 'examples/**'
   pull_request:
     branches: [master]
-    paths:
-    - '.github/workflows/windows.yml'
-    - 'CMakeLists.txt'
-    - 'cmake/**'
-    - 'src/*'
-    - 'src/layer/*'
-    - 'src/layer/x86/**'
-    - 'src/layer/vulkan/**'
-    - 'tests/**'
-    - 'tools/**'
-    - '!tools/pnnx/**'
-    - 'examples/**'
 concurrency:
   group: windows-${{ github.ref }}
   cancel-in-progress: true
@@ -37,29 +13,25 @@ permissions:
 jobs:
   windows-gpu:
     name: ${{ matrix.vs-version }}
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-2022
     strategy:
       matrix:
         include:
           - vs-version: vs2015
             toolset-version: v140
-            os: windows-2022
-            vc-component: Microsoft.VisualStudio.Component.VC.140
-            vs-version-year: '14.0' # VS 2015
+            # Use the official component ID for the v140 build tools
+            vc-component: Microsoft.VisualStudio.Component.VC.Tools.v140
 
           - vs-version: vs2017
             toolset-version: v141
-            os: windows-2022
-            vc-component: Microsoft.VisualStudio.Component.VC.141
-            vs-version-year: '15.9' # VS 2017
+            # Use the official component ID for the v141 build tools
+            vc-component: Microsoft.VisualStudio.Component.VC.Tools.v141
 
           - vs-version: vs2019
             toolset-version: v142
-            os: windows-2022
 
           - vs-version: vs2022
             toolset-version: v143
-            os: windows-2022
 
     env:
       UseMultiToolTask: true
@@ -68,24 +40,18 @@ jobs:
       with:
         submodules: true
 
-    - name: Install and Set up Older VS Build Tools
+    - name: Install Older VS Build Tools
       if: matrix.vc-component
       shell: pwsh
       run: |
         echo "Installing component ${{ matrix.vc-component }}..."
-        Set-Location "C:\Program Files (x86)\Microsoft Visual Studio\Installer\"
-        $InstallPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise"
-        $workloadArgs = "--add ${{ matrix.vc-component }} --includeRecommended"
-        $Arguments = ('modify', '--installPath', "`"$InstallPath`"", '--add', '${{ matrix.vc-component }}', '--quiet', '--norestart', '--nocache')
-        Start-Process -FilePath ".\vs_installer.exe" -ArgumentList $Arguments -Wait -PassThru
-
-    - name: Setup MSBuild Environment
-      if: matrix.vs-version-year
-      uses: microsoft/setup-msbuild@v2
-      with:
-        vs-version: ${{ matrix.vs-version-year }}
-
-    # ... The rest of your steps remain the same ...
+        $process = Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" -ArgumentList "modify --installPath `"C:\Program Files\Microsoft Visual Studio\2022\Enterprise`" --add ${{ matrix.vc-component }} --quiet --norestart --nocache" -Wait -PassThru
+        if ($process.ExitCode -ne 0) {
+            throw "VS Installer failed with exit code $($process.ExitCode)"
+        }
+        
+    # The rest of your build steps remain unchanged.
+    # The setup-msbuild step has been removed.
 
     - name: cache-protobuf
       id: cache-protobuf
@@ -133,7 +99,7 @@ jobs:
         cmake -T ${{ matrix.toolset-version }},host=x64 -A x64 -DCMAKE_INSTALL_PREFIX=install -DSWIFTSHADER_BUILD_EGL=FALSE -DSWIFTSHADER_BUILD_GLESv2=FALSE -DSWIFTSHADER_BUILD_GLES_CM=FALSE -DSWIFTSHADER_BUILD_VULKAN=TRUE -DSWIFTSHADER_BUILD_PVR=FALSE -DSWIFTSHADER_BUILD_TESTS=FALSE -DSWIFTSHADER_ENABLE_ASTC=FALSE -DSWIFTSHADER_WARNINGS_AS_ERRORS=FALSE -DREACTOR_BACKEND=Subzero -DREACTOR_DEFAULT_OPT_LEVEL=Default -DCMAKE_BUILD_TYPE=Release ..
         cmake --build . --config Release -j 4
         mkdir "$env:GITHUB_WORKSPACE/swiftshader-install"
-        Copy-Item -Path "Windows\*" -Destination "$env:GITHUB_WORKSPACE\swiftshader-install"
+        Copy-Item -Path "Windows\*" -Destination "$env:GITHUB_WORKSPACE/swiftshader-install"
 
     - name: x64
       shell: pwsh
