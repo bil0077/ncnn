@@ -184,3 +184,4 @@ jobs:
       run: |
         Copy-Item -Path "build-x86\src\Release\ncnn.dll" -Destination 'build-x86\tests'
         cd build-x86; ctest -C Release --output-on-failure -j 4
+# for trigger ci
